@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自动出题程序</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            overflow: hidden; /* 防止页面整体滚动 */
+        }
+        #container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-y: auto; /* 允许垂直滚动 */
+            max-height: 70vh; /* 最大高度设置为视口的70% */
+            padding: 20px;
+            box-sizing: border-box; /* 包括内边距和边框在内 */
+        }
+        #questions {
+            margin-top: 20px;
+            width: 100%;
+        }
+        .question {
+            margin: 10px 0;
+        }
+        .error {
+            color: red;
+        }
+        .solution {
+            margin-top: 5px;
+            display: none;
+        }
+        .button {
+            margin-top: 20px;
+        }
+        #score {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+        #timer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+        }
+        #submit-all {
+            position: absolute;
+            top: 60px;
+            right: 20px;
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 1.2em;
+        }
+        #final-result {
+            color: red;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>自动出题程序</h1>
+    <label for="numQuestions">请输入题目数量:</label>
+    <input type="number" id="numQuestions" min="1" value="5">
+    <label for="timerOptions">选择倒计时时间:</label>
+    <select id="timerOptions">
+        <option value="1">1分钟</option>
+        <option value="5">5分钟</option>
+        <option value="10">10分钟</option>
+        <option value="20">20分钟</option>
+        <option value="30">30分钟</option>
+        <option value="45">45分钟</option>
+        <option value="60">60分钟</option>
+    </select>
+    <button class="button" onclick="generateQuestions()">生成题目</button>
+    <div id="score">剑魔的分数: 0</div>
+    <div id="timer">剩余时间: 0:00</div>
+    <button id="submit-all" class="button" onclick="submitAll()">提交全部</button>
+    <div id="container">
+        <div id="questions"></div>
+        <div id="result"></div>
+        <div id="final-result"></div>
+    </div>
+
+    <script>
+        let totalScore = 0;
+        let currentScore = 0;
+        let numQuestions = 0;
+        let questionScore = 0;
+        let timer;
+        let timeLeft;
+
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function generateQuestion() {
+            const operations = ['+', '-', '*', '/'];
+            let num1 = getRandomInt(1, 100);
+            let num2 = getRandomInt(1, 100);
+            const operation = operations[getRandomInt(0, operations.length - 1)];
+
+            let question;
+            let answer;
+
+            if (operation === '/') {
+                while (num2 === 0 || num1 % num2 !== 0) {
+                    num1 = getRandomInt(1, 100);
+                    num2 = getRandomInt(1, 100);
+                }
+                question = `${num1} ${operation} ${num2}`;
+                answer = num1 / num2;
+            } else if (operation === '-') {
+                if (num1 < num2) [num1, num2] = [num2, num1];
+                question = `${num1} ${operation} ${num2}`;
+                answer = eval(question);
+            } else {
+                question = `${num1} ${operation} ${num2}`;
+                answer = eval(question);
+            }
+
+            return { question, answer };
+        }
+
+        function generateQuestions() {
+            numQuestions = parseInt(document.getElementById('numQuestions').value);
+            questionScore = 100 / numQuestions;
+            currentScore = 0;
+            totalScore = 0;
+            const questionsDiv = document.getElementById('questions');
+            const resultDiv = document.getElementById('result');
+            const finalResultDiv = document.getElementById('final-result');
+            resultDiv.innerHTML = '';
+            finalResultDiv.innerHTML = '';
+            questionsDiv.innerHTML = '';
+
+            for (let i = 0; i < numQuestions; i++) {
+                const { question, answer } = generateQuestion();
+                const questionElement = document.createElement('div');
+                questionElement.className = 'question';
+
+                const questionText = document.createElement('span');
+                questionText.textContent = `题目 ${i + 1}: ${question} = `;
+                questionElement.appendChild(questionText);
+
+                const answerInput = document.createElement('input');
+                answerInput.type = 'number';
+                answerInput.className = 'answer-input';
+                questionElement.appendChild(answerInput);
+
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error';
+                questionElement.appendChild(errorDiv);
+
+                const solutionButton = document.createElement('button');
+                solutionButton.textContent = '查看解题步骤';
+                solutionButton.style.display = 'none';
+                solutionButton.onclick = () => showSolution(solutionDiv);
+                questionElement.appendChild(solutionButton);
+
+                const solutionDiv = document.createElement('div');
+                solutionDiv.className = 'solution';
+                solutionDiv.textContent = `解题步骤: ${question} = ${answer}`;
+                questionElement.appendChild(solutionDiv);
+
+                questionsDiv.appendChild(questionElement);
+            }
+
+            const timerOptions = document.getElementById('timerOptions');
+            const selectedTime = parseInt(timerOptions.value) * 60;
+            startTimer(selectedTime);
+        }
+
+        function checkAnswer(inputElement, correctAnswer, solutionDiv, errorDiv) {
+            const userAnswer = parseFloat(inputElement.value);
+            if (userAnswer === correctAnswer) {
+                errorDiv.textContent = '正确';
+                errorDiv.style.color = 'green';
+                currentScore += questionScore;
+            } else {
+                errorDiv.textContent = '错误';
+                errorDiv.style.color = 'red';
+                solutionDiv.previousSibling.style.display = 'inline';
+            }
+            inputElement.disabled = true;
+            totalScore++;
+            updateScore();
+        }
+
+        function showSolution(solutionDiv) {
+            solutionDiv.style.display = 'block';
+        }
+
+        function updateScore() {
+            document.getElementById('score').textContent = `剑魔的分数: ${currentScore.toFixed(2)}`;
+        }
+
+        function showFinalResult() {
+            const resultDiv = document.getElementById('result');
+            const finalResultDiv = document.getElementById('final-result');
+            let resultText = `你的总分是: ${currentScore.toFixed(2)} - `;
+            if (currentScore === 100) {
+                resultText += "旷世奇才";
+            } else if (currentScore >= 90) {
+                resultText += "天才";
+            } else if (currentScore >= 80) {
+                resultText += "优秀";
+            } else if (currentScore >= 60) {
+                resultText += "及格";
+            } else {
+                resultText += "不及格";
+            }
+            resultDiv.textContent = resultText;
+            finalResultDiv.textContent = resultText;
+        }
+
+        function startTimer(duration) {
+            const timerDiv = document.getElementById('timer');
+            timeLeft = duration;
+
+            timer = setInterval(() => {
+                let minutes = Math.floor(timeLeft / 60);
+                let seconds = timeLeft % 60;
+
+                if (seconds < 10) {
+                    seconds = `0${seconds}`;
+                }
+
+                timerDiv.textContent = `剩余时间: ${minutes}:${seconds}`;
+
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    submitAll(); // 倒计时结束时自动提交
+                }
+
+                timeLeft--;
+            }, 1000);
+        }
+
+        function submitAll() {
+            const answerInputs = document.querySelectorAll('.answer-input');
+            const questions = document.querySelectorAll('.question');
+            answerInputs.forEach((input, index) => {
+                const correctAnswer = parseFloat(questions[index].querySelector('.solution').textContent.split('=')[1].trim());
+                checkAnswer(input, correctAnswer, questions[index].querySelector('.solution'), questions[index].querySelector('.error'));
+                input.disabled = true; // 禁止继续作答
+            });
+            showFinalResult();
+            clearInterval(timer); // 清除计时器
+        }
+    </script>
+</body>
+</html>
